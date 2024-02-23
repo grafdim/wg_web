@@ -1,3 +1,4 @@
+#!/usr/bin/luajit
 local wgUtils = require("wgParse")
 local lummander = require("lummander")
 local json = require("lunajson")
