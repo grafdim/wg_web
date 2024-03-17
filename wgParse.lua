@@ -10,7 +10,7 @@ local binding = lpeg.C(loc.alnum ^ 1)
 	* whitespace
 	* "="
 	* whitespace
-	* lpeg.C((loc.alnum + lpeg.S("+=/.")) ^ 1)
+	* lpeg.C((loc.alnum + lpeg.S("+=/.:")) ^ 1)
 	* whitespace
 	/ function(key, val)
 		return { [key] = val }
