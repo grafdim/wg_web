@@ -23,6 +23,8 @@ class Backend:
             f.write(utils.repr_config(self.config))
 
     def del_user(self, user: str):
+        if user not in self.config:
+            raise KeyError("User does not exist!")
         del self.config[user]
         self.write_cfg()
 
