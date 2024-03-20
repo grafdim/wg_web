@@ -78,4 +78,3 @@ def gen_user_keys() -> dict:
             "PublicKey": public,
             "PresharedKey": psk
             }, private)
-print(len(reserved_ips("./wg0.conf")))
