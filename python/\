@@ -1,0 +1,84 @@
+from subprocess import Popen, PIPE
+from random import randint
+from ipaddress import ip_address
+import config, json
+
+def randIP(ip_cidr: str) -> str:
+    baseIP, reserved_bits = ip_cidr.split("/")
+    max_num = (1 << (32 - int(reserved_bits))) - 1
+    ip_num = int(ip_address(baseIP))
+    rand_num = randint(1, max_num)
+    return str(ip_address(ip_num ^ rand_num))
+
+
+
+class WireguardConfig:
+    def __init__(self, path: str, create: bool = False):
+        self.path: str = path
+        self.config: dict = {}
+        self.reserved_ips: list = []
+        self.cidr: str = config.cidr
+        if create:
+            try:
+                f = open(path, 'x', encoding="utf-8")
+                f.close()
+            except FileExistsError:
+                raise FileExistsError(f"File {path} already exists ")
+        else:
+            self.load_config()
+
+
+    @staticmethod
+    def randIP(ip_cidr: str) -> str:
+        baseIP, reserved_bits = ip_cidr.split("/")
+        max_num = (1 << (32 - int(reserved_bits))) - 1
+        ip_num = int(ip_address(baseIP))
+        rand_num = randint(1, max_num)
+        return str(ip_address(ip_num ^ rand_num))
+
+
+    def load_config(self):
+
+        '''
+        Load the wireguard configuration into memory
+        '''
+        with Popen(["lua", config.lua_script, "json", config.wg_config_path], stdout=PIPE,stderr=PIPE,text=True) as script:
+            out, err = script.communicate()
+            if len(err) == 0:
+                self.config = json.loads(out)
+                for user in self.config.keys():
+                    if user != "Interface":
+                        self.reserved_ips.append(self.config[user]["AllowedIPs"]
+                                                .split("/")[0])
+                    self.reserved_ips.append(self.config["Interface"]["Address"].split("/")[0])
+            else:
+                raise RuntimeError("Error parsing the configuration file!")
+
+
+    def add_user(self, name: str):
+        if self.config.get(name) is not None:
+            raise ValueError("User already exists!")
+        random_ip = randIP(self.cidr)
+        while random_ip in self.reserved_ips:
+            random_ip = randIP(self.cidr)
+        random_ip += "/32"
+        gen_pkey = Popen(["wg", "genkey"], stdout=PIPE, stderr=PIPE, text=True)
+        pkey, err = gen_pkey.communicate()
+        assert len(err) == 0
+        gen_pubkey = Popen(["wg", "pubkey"], stdin=PIPE, stdout=PIPE, stderr=PIPE, text=True)
+        pubkey, err = gen_pubkey.communicate(input=pkey)
+        gen_psk = Popen(["wg", "genpsk"], stdout=PIPE, stderr=PIPE, text=True)
+        psk, err = gen_psk.communicate()
+        config = f'[Peer] # {name}\nPublicKey = {pubkey}AllowedIPs = {random_ip}\nPresharedKey = {psk}\n'
+        return config
+          #  {name : {
+          #  'PresharedKey': psk,
+          #  'PublicKey': pkey,
+          #  'AllowedIPs': random_ip,
+          #  'PrivateKey': pkey
+
+       # }}
+
+cfg = WireguardConfig("../wg0.conf")
+
+print(cfg.add_user("dimmm"))
